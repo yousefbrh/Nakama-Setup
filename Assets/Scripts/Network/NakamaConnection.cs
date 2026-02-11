@@ -1,3 +1,5 @@
+using System;
+using Cysharp.Threading.Tasks;
 using Nakama;
 using UnityEngine;
 
@@ -16,25 +18,47 @@ namespace Network
 
         async void Start()
         {
-            // 1. Create the Client
-            // The client represents the connection configuration to the server.
-            client = new Client(scheme, host, port, serverKey, UnityWebRequestAdapter.Instance);
-
-            // 2. Authenticate
-            // We will use the device's unique ID.
-            // If the account exists, it logs in. If not, it creates a new one.
-            string deviceId = SystemInfo.deviceUniqueIdentifier;
+            await AuthenticateUserAsync();
+            await CreateGuildAsync();
+        }
         
+        private async UniTask CreateGuildAsync()
+        {
+            // 1. Define Group Details
+            string groupName = "Warriors of Code";
+            string description = "The official guild for this tutorial.";
+            string avatarUrl = "http://example.com/icon.png";
+            string langTag = "en"; // Language
+            bool open = true; // True = Anyone can join. False = Request needed.
+            int maxCount = 50; // Max members
+
+            try 
+            {
+                // 2. Send request to Server
+                // Nakama returns a generic IGroup interface
+                var group = await client.CreateGroupAsync(session, groupName, description, avatarUrl, langTag, open, maxCount);
+            
+                Debug.Log("Group Created Successfully!");
+                Debug.Log("Group ID: " + group.Id);
+                Debug.Log("Group Name: " + group.Name);
+            }
+            catch (ApiResponseException ex) 
+            {
+                // If you run this twice, it might fail because the group name implies uniqueness depending on configuration,
+                // or if you simply spam creation.
+                Debug.LogError("Could not create group: " + ex.Message);
+            }
+        }
+        private async UniTask AuthenticateUserAsync()
+        {
+            client = new Client(scheme, host, port, serverKey, UnityWebRequestAdapter.Instance);
+            var deviceId = SystemInfo.deviceUniqueIdentifier;
             try
             {
-                // The 'true' argument tells Nakama to create the account if it doesn't exist.
                 session = await client.AuthenticateDeviceAsync(deviceId, username: null, create: true);
-
                 Debug.Log("Successfully authenticated!");
-                Debug.Log("Session Token: " + session.AuthToken);
-                Debug.Log("User ID: " + session.UserId);
             }
-            catch (ApiResponseException ex)
+            catch (Exception ex)
             {
                 Debug.LogError("Error authenticating: " + ex.Message);
             }
