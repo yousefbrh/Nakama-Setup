@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Cysharp.Threading.Tasks;
+using Models;
 using Nakama;
 using UnityEngine;
 
@@ -15,11 +18,14 @@ namespace Network
 
         private IClient client;
         private ISession session;
+        private PlayerData myData;
 
         async void Start()
         {
             await AuthenticateUserAsync();
-            await CreateGuildAsync();
+            // await CreateGuildAsync();
+            // await SavePlayerDataAsync();
+            // await LoadPlayerDataAsync();
         }
         
         private async UniTask CreateGuildAsync()
@@ -49,6 +55,66 @@ namespace Network
                 Debug.LogError("Could not create group: " + ex.Message);
             }
         }
+        
+        private async UniTask SavePlayerDataAsync()
+        {
+            var dataToSave = new PlayerData
+            {
+                level = 10,
+                xp = 5500,
+                coins = 1234,
+                unlockedItems = new List<string> { "sword", "shield" }
+            };
+            
+            var jsonData = JsonUtility.ToJson(dataToSave);
+            
+            var storageObject = new WriteStorageObject
+            {
+                Collection = "player_data",
+                Key = "profile",
+                Value = jsonData,
+                PermissionRead = 0, // Owner Read
+                PermissionWrite = 0 // Owner Write
+            };
+
+            await client.WriteStorageObjectsAsync(session, new IApiWriteStorageObject[] { storageObject });
+
+            Debug.Log("Successfully saved player data!");
+        }
+        
+        private async UniTask LoadPlayerDataAsync()
+        {
+            var objectId = new StorageObjectId
+            {
+                Collection = "player_data",
+                Key = "profile",
+                UserId = session.UserId
+            };
+
+            try
+            {
+                var result = await client.ReadStorageObjectsAsync(session, new IApiReadStorageObjectId[] { objectId });
+
+                if (result.Objects.Any())
+                {
+                    var storageObject = result.Objects.First();
+            
+                    myData = JsonUtility.FromJson<PlayerData>(storageObject.Value);
+
+                    Debug.Log("Successfully loaded player data!");
+                    Debug.Log($"Level: {myData.level}, Coins: {myData.coins}");
+                }
+                else
+                {
+                    Debug.Log("No player data found. This might be a new player.");
+                }
+            }
+            catch (ApiResponseException ex)
+            {
+                Debug.LogError("Error loading data: " + ex.Message);
+            }
+        }
+        
         private async UniTask AuthenticateUserAsync()
         {
             client = new Client(scheme, host, port, serverKey, UnityWebRequestAdapter.Instance);
